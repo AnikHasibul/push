@@ -5,24 +5,16 @@ import (
 	"errors"
 )
 
-// Client holds the interface for push and pull mechanism
-type Client interface {
-	// Push sends a message to all connected clients.
-	Push(message interface{})
-	// Pull pulls a message for the given clientID.
-	Pull(clientID interface{}) (message interface{}, err error)
-}
-
 // NewClient returns a client interface.
 //	`sessionID` means the userID or a groupID.
 //	`clientID` means the deviceID.
 //
 // A single user (sessionID) can use multiple devices (clientID).
 // That's why the clientID should be unique for each device.
-func NewClient(sessionID, clientID interface{}) Client {
+func NewClient(sessionID, clientID interface{}) *Client {
 	ch := make(chan interface{})
 	if _, ok := cmap[sessionID]; !ok {
-		cmap[sessionID] = &c{
+		cmap[sessionID] = &Client{
 			clients: make(map[interface{}]chan interface{}),
 		}
 	}
@@ -33,15 +25,21 @@ func NewClient(sessionID, clientID interface{}) Client {
 }
 
 type (
-	c struct {
+	// Client holds the interface for push and pull mechanism
+	Client struct {
 		clients map[interface{}]chan interface{}
 	}
-	clientmap map[interface{}]*c
+	clientmap map[interface{}]*Client
 )
 
 var cmap = make(clientmap)
 
-func (c *c) Push(message interface{}) {
+// Push sends a message to all connected clients.
+/*
+	c := push.NewClient(userID, nil)
+	c.Push("Hello world!")
+*/
+func (c *Client) Push(message interface{}) {
 	for _, v := range c.clients {
 		go func(ch chan interface{}) {
 			ch <- message
@@ -49,9 +47,46 @@ func (c *c) Push(message interface{}) {
 	}
 }
 
-func (c *c) Pull(clientID interface{}) (content interface{}, err error) {
+// Pull pulls a message for the given clientID.
+/*
+	c := push.NewClient(userID, clID)
+	for {
+		msg, err := c.Pull(clID):
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(msg)
+	}
+*/
+func (c *Client) Pull(clientID interface{}) (content interface{}, err error) {
 	if ch, ok := c.clients[clientID]; ok {
 		content = <-ch
+	} else {
+		err = errors.New("push: no such client")
+	}
+	return
+}
+
+// PullChan returns a channel for receiving messages for the given clientID
+/*
+	c := push.NewClient(userID, clID)
+	ch, err := c.PullChan(clID):
+	if err != nil {
+		panic(err)
+	}
+	for {
+	  select {
+		case msg := <- ch:
+		fmt.Println(msg)
+	  }
+	}
+
+*/
+//
+// Extremely usable with websockets
+func (c *Client) PullChan(clientID interface{}) (message chan interface{}, err error) {
+	if ch, ok := c.clients[clientID]; ok {
+		return ch, nil
 	} else {
 		err = errors.New("push: no such client")
 	}
