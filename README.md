@@ -2,58 +2,102 @@
 --
     import "github.com/anikhasibul/push"
 
-package push gives you the ability to use push and pull mechanism for
+Package push gives you the ability to use push and pull mechanism for
 notification or message via websocket or even http client.
 
 ## Usage
 
-#### type Client
+#### func  DeleteSession
 
 ```go
-type Client struct {
+func DeleteSession(sessionID interface{})
+```
+DeleteSession deletes the given session from memory. It's safe to delete a
+non-existent session.
+
+#### type ClientChan
+
+```go
+type ClientChan chan interface{}
+```
+
+ClientChan holds a chan of interface type to provide type flexibility on pushed
+message
+
+#### type Session
+
+```go
+type Session struct {
 }
 ```
 
-Client holds the interface for push and pull mechanism
+Session holds the methods for push and pull mechanism
 
-#### func  NewClient
+#### func  NewSession
 
 ```go
-func NewClient(sessionID, clientID interface{}) *Client
+func NewSession(sessionID, clientID interface{}, maxChannelBuffer int) *Session
 ```
-NewClient returns a client interface.
-
-    `sessionID` means the userID or a groupID.
-    `clientID` means the deviceID.
+NewSession returns a client session.
 
 A single user (sessionID) can use multiple devices (clientID). That's why the
-clientID should be unique for each device.
+clientID should be unique for each device/client/connection.
 
-#### func (*Client) Pull
+    `sessionID` means the userID or a groupID. Once a `Session` receives a message, it pushes the message to all registered client for this session.
+
+    `clientID` means the deviceID. A new client will be created on the given session if the `sessionID` is not `nil`.
+
+    `maxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},maxChannelBuffer)`
+
+#### func (*Session) Clients
 
 ```go
-func (c *Client) Pull(clientID interface{}) (content interface{}, err error)
+func (s *Session) Clients() []interface{}
+```
+Clients returns the keys/IDs/names of active clients on current session.
+
+#### func (*Session) DeleteClient
+
+```go
+func (s *Session) DeleteClient(clientID interface{})
+```
+DeleteClient deletes the given client from the current session. It's safe to
+delete a non-existent client.
+
+#### func (*Session) Len
+
+```go
+func (s *Session) Len() int
+```
+Len returns the length/count of active clients on current session.
+
+#### func (*Session) Pull
+
+```go
+func (s *Session) Pull(clientID interface{}) (content interface{}, err error)
 ```
 Pull pulls a message for the given clientID.
 
-    c := push.NewClient(userID, clID)
+    s := push.NewClient(userID, clID,100)
+    defer s.DeleteClient(clID)
     for {
-    	msg, err := c.Pull(clID):
+    	msg, err := s.Pull(clID):
     	if err != nil {
     		panic(err)
     	}
     	fmt.Println(msg)
     }
 
-#### func (*Client) PullChan
+#### func (*Session) PullChan
 
 ```go
-func (c *Client) PullChan(clientID interface{}) (message chan interface{}, err error)
+func (s *Session) PullChan(clientID interface{}) (message ClientChan, err error)
 ```
 PullChan returns a channel for receiving messages for the given clientID
 
-    c := push.NewClient(userID, clID)
-    ch, err := c.PullChan(clID):
+    s := push.NewClient(userID, clID,100)
+    defer s.DeleteClient(clID)
+    ch, err := s.PullChan(clID):
     if err != nil {
     	panic(err)
     }
@@ -64,14 +108,14 @@ PullChan returns a channel for receiving messages for the given clientID
       }
     }
 
-Extremely usable with websockets
+Exclusively usable with websockets
 
-#### func (*Client) Push
+#### func (*Session) Push
 
 ```go
-func (c *Client) Push(message interface{})
+func (s *Session) Push(message interface{})
 ```
-Push sends a message to all connected clients.
+Push sends a message to all connected clients on the given session.
 
-    c := push.NewClient(userID, nil)
-    c.Push("Hello world!")
+    s := push.NewClient(userID, nil,0)
+    s.Push("Hello world!")

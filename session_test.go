@@ -3,7 +3,7 @@ package push
 import "testing"
 
 func TestPush(t *testing.T) {
-	c := NewClient("userID", "UniqueClientID")
+	c := NewClient("userID", "UniqueClientID", 100)
 	c.Push("message")
 	m, err := c.Pull("UniqueClientID")
 	if err != nil {
