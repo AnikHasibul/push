@@ -15,6 +15,77 @@ func DeleteSession(sessionID interface{})
 DeleteSession deletes the given session from memory. It's safe to delete a
 non-existent session.
 
+#### type Client
+
+```go
+type Client struct {
+}
+```
+
+Client holds the methods for a perticular client.
+
+#### func (*Client) DeleteSelf
+
+```go
+func (c *Client) DeleteSelf()
+```
+DeleteSelf deletes the current client from the current session.
+
+#### func (*Client) Key
+
+```go
+func (c *Client) Key() interface{}
+```
+Key returns the current clientID/name/key.
+
+#### func (*Client) Pull
+
+```go
+func (c *Client) Pull() (content interface{}, err error)
+```
+Pull pulls a message for the current client.
+
+    var (
+    	userID := 123446555
+    	clID := "device_mobile_5445"
+    )
+
+    s := NewSession(userID)
+    c := s.NewClient(clID)
+    defer c.DeleteSelf()
+
+    msg, err := c.Pull()
+    if err != nil {
+    	panic(err)
+    }
+    fmt.Println(msg)
+
+#### func (*Client) PullChan
+
+```go
+func (c *Client) PullChan() (ClientChan, error)
+```
+PullChan returns a channel for receiving messages for the current client.
+
+    var (
+    	userID := 123446555
+    	clID := "device_mobile_5645"
+    )
+
+    s := NewSession(userID)
+    c := s.NewClient(clID)
+    defer c.DeleteSelf()
+
+    ch, err := c.PullChan()
+    if err != nil {
+    	panic(err)
+    }
+
+    msg := <-ch
+    fmt.Println(msg)
+
+Exclusively usable with websockets
+
 #### type ClientChan
 
 ```go
@@ -28,6 +99,10 @@ message
 
 ```go
 type Session struct {
+
+	//	`MaxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},MaxChannelBuffer)`.
+	// Default value is 10
+	MaxChannelBuffer int
 }
 ```
 
@@ -36,7 +111,7 @@ Session holds the methods for push and pull mechanism
 #### func  NewSession
 
 ```go
-func NewSession(sessionID, clientID interface{}, maxChannelBuffer int) *Session
+func NewSession(sessionID interface{}) *Session
 ```
 NewSession returns a client session.
 
@@ -44,10 +119,6 @@ A single user (sessionID) can use multiple devices (clientID). That's why the
 clientID should be unique for each device/client/connection.
 
     `sessionID` means the userID or a groupID. Once a `Session` receives a message, it pushes the message to all registered client for this session.
-
-    `clientID` means the deviceID. A new client will be created on the given session if the `sessionID` is not `nil`.
-
-    `maxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},maxChannelBuffer)`
 
 #### func (*Session) Clients
 
@@ -64,6 +135,13 @@ func (s *Session) DeleteClient(clientID interface{})
 DeleteClient deletes the given client from the current session. It's safe to
 delete a non-existent client.
 
+#### func (*Session) DeleteSelf
+
+```go
+func (s *Session) DeleteSelf()
+```
+DeleteSelf deletes the current session from memory.
+
 #### func (*Session) Len
 
 ```go
@@ -71,44 +149,21 @@ func (s *Session) Len() int
 ```
 Len returns the length/count of active clients on current session.
 
-#### func (*Session) Pull
+#### func (*Session) NewClient
 
 ```go
-func (s *Session) Pull(clientID interface{}) (content interface{}, err error)
+func (s *Session) NewClient(clientID interface{}) *Client
 ```
-Pull pulls a message for the given clientID.
+NewClient returns a `Client`.
 
-    s := push.NewClient(userID, clID,100)
-    defer s.DeleteClient(clID)
-    for {
-    	msg, err := s.Pull(clID):
-    	if err != nil {
-    		panic(err)
-    	}
-    	fmt.Println(msg)
-    }
+It creates a new client if the given `clientID` does not exist.
 
-#### func (*Session) PullChan
+It returns the existing client for the given `clientID` if it already exists.
 
-```go
-func (s *Session) PullChan(clientID interface{}) (message ClientChan, err error)
-```
-PullChan returns a channel for receiving messages for the given clientID
+it panics if the given `clientID` is nil.
 
-    s := push.NewClient(userID, clID,100)
-    defer s.DeleteClient(clID)
-    ch, err := s.PullChan(clID):
-    if err != nil {
-    	panic(err)
-    }
-    for {
-      select {
-    	case msg := <- ch:
-    	fmt.Println(msg)
-      }
-    }
-
-Exclusively usable with websockets
+A single user (sessionID) can use multiple devices (clientID). That's why the
+clientID should be unique for each device/client/connection.
 
 #### func (*Session) Push
 

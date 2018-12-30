@@ -5,25 +5,22 @@ import (
 	"testing"
 )
 
-func TestPush(t *testing.T) {
+func TestPull(t *testing.T) {
 	userID := 1234
 	clID := 123
 
 	s := NewSession(userID)
 	c := s.NewClient(clID)
 	defer c.DeleteSelf()
-
-	ch, err := c.PullChan()
+	go s.Push("Hello")
+	msg, err := c.Pull()
 	if err != nil {
 		panic(err)
 	}
 
-	go s.Push("Hello")
-	msg := <-ch
-
 	if m, ok := msg.(string); ok {
 		if m == "Hello" {
-			fmt.Println(msg)
+			fmt.Println(m)
 			return
 		}
 	}

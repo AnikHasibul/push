@@ -33,7 +33,12 @@ var cmap = make(clientmap)
 
 // Session holds the methods for push and pull mechanism
 type Session struct {
-	clients clients
+
+	//	`MaxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},MaxChannelBuffer)`.
+	// Default value is 10
+	MaxChannelBuffer int
+	id               interface{}
+	clients          clients
 }
 
 // ClientChan holds a chan of interface type to provide type flexibility on pushed message
@@ -47,32 +52,56 @@ type ClientChan chan interface{}
 //
 //	`sessionID` means the userID or a groupID. Once a `Session` receives a message, it pushes the message to all registered client for this session.
 //
-//	`clientID` means the deviceID. A new client will be created on the given session if the `sessionID` is not `nil`.
-//
-//	`maxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},maxChannelBuffer)`
-//
-func NewSession(sessionID, clientID interface{}, maxChannelBuffer int) *Session {
+func NewSession(sessionID interface{}) *Session {
 	// if the session doesn't exist, create a new one
 	if _, ok := cmap[sessionID]; !ok {
 		mu.Lock()
 		cmap[sessionID] = &Session{
-			clients: make(clients),
+			id:               sessionID,
+			MaxChannelBuffer: 10,
+			clients:          make(clients),
 		}
 		mu.Unlock()
 	}
-	// if the clientexists, return the existing one
-	if _, ok := cmap[sessionID].clients[clientID]; ok {
-		return cmap[sessionID]
-	}
-	// create a new client
-	if clientID != nil {
-		clientChan := make(ClientChan, maxChannelBuffer)
-		mu.Lock()
-		cmap[sessionID].clients[clientID] = clientChan
-		mu.Unlock()
-	}
-	// return the created session
 	return cmap[sessionID]
+}
+
+// NewClient returns a `Client`.
+//
+// It creates a new client if the given `clientID` does not exist.
+//
+// It returns the existing client for the given `clientID` if it already exists.
+//
+// it panics if the given `clientID` is nil.
+//
+//
+// A single user (sessionID) can use multiple devices (clientID).
+// That's why the clientID should be unique for each device/client/connection.
+func (s *Session) NewClient(clientID interface{}) *Client {
+
+	// if the client exists, return the existing one
+	if _, ok := cmap[s.id].
+		clients[clientID]; ok {
+		return &Client{
+			clientID: clientID,
+			session:  cmap[s.id],
+		}
+	}
+	// panic for nil
+	if clientID == nil {
+		panic("push: clientID is nil")
+	}
+	// create a new one
+	clientChan := make(ClientChan, s.MaxChannelBuffer)
+	mu.Lock()
+	cmap[s.id].clients[clientID] = clientChan
+	mu.Unlock()
+
+	// return the created client
+	return &Client{
+		clientID: clientID,
+		session:  cmap[s.id],
+	}
 }
 
 // Push sends a message to all connected clients on the given session.
@@ -90,55 +119,6 @@ func (s *Session) Push(message interface{}) {
 		}(key)
 	}
 	wg.Wait()
-}
-
-// Pull pulls a message for the given clientID.
-/*
-	s := push.NewClient(userID, clID,100)
-	defer s.DeleteClient(clID)
-	for {
-		msg, err := s.Pull(clID):
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(msg)
-	}
-*/
-func (s *Session) Pull(clientID interface{}) (content interface{}, err error) {
-	if ch, ok := s.clients[clientID]; ok {
-		content = <-ch
-	} else {
-		err = errors.New("push: no such client")
-	}
-	return
-}
-
-// PullChan returns a channel for receiving messages for the given clientID
-/*
-	s := push.NewClient(userID, clID,100)
-	defer s.DeleteClient(clID)
-	ch, err := s.PullChan(clID):
-	if err != nil {
-		panic(err)
-	}
-	for {
-	  select {
-		case msg := <- ch:
-		fmt.Println(msg)
-	  }
-	}
-
-*/
-//
-// Exclusively usable with websockets
-func (s *Session) PullChan(clientID interface{}) (message ClientChan, err error) {
-
-	if ch, ok := s.clients[clientID]; ok {
-		return ch, nil
-	}
-	err = errors.New("push: no such client")
-
-	return
 }
 
 // DeleteClient deletes the given client from the current session.
@@ -159,6 +139,32 @@ func (s *Session) Clients() []interface{} {
 		ret = append(ret, k)
 	}
 	return ret
+}
+
+// DeleteSelf deletes the current session from memory.
+func (s *Session) DeleteSelf() {
+	delete(cmap, s.id)
+}
+
+// pull ...
+func (s *Session) pull(clientID interface{}) (content interface{}, err error) {
+	if ch, ok := s.clients[clientID]; ok {
+		content = <-ch
+	} else {
+		err = errors.New("push: no such client")
+	}
+	return
+}
+
+// pullChan ...
+func (s *Session) pullChan(clientID interface{}) (message ClientChan, err error) {
+
+	if ch, ok := s.clients[clientID]; ok {
+		return ch, nil
+	}
+	err = errors.New("push: no such client")
+
+	return
 }
 
 // DeleteSession deletes the given session from memory.
