@@ -123,7 +123,7 @@ func (s *Session) Push(message interface{}) {
 
 // closeClient closes a client channel/connection
 func (s *Session) closeClient(clientID interface{}) {
-	close(s.clients[k])
+	close(s.clients[clientID])
 }
 
 // DeleteClient deletes the given client from the current session.

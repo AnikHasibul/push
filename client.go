@@ -61,7 +61,7 @@ func (c *Client) PullChan() (ClientChan, error) {
 
 // Close closes a client channel/connection
 func (c *Client) Close() {
-	return c.once.Do(c.session.closeClient(c.clientID))
+	c.once.Do(func() { c.session.closeClient(c.clientID) })
 }
 
 // Key returns the current clientID/name/key.
