@@ -1,8 +1,14 @@
 package push
 
+import (
+	"fmt"
+	"sync"
+)
+
 // Client holds the methods for a perticular client.
 type Client struct {
 	clientID interface{}
+	once     sync.Once
 	session  *Session
 }
 
@@ -53,9 +59,19 @@ func (c *Client) PullChan() (ClientChan, error) {
 	return c.session.pullChan(c.clientID)
 }
 
+// Close closes a client channel/connection
+func (c *Client) Close() {
+	return c.once.Do(c.session.closeClient(c.clientID))
+}
+
 // Key returns the current clientID/name/key.
 func (c *Client) Key() interface{} {
 	return c.clientID
+}
+
+// KeyString returns the current clientID/name/key in string type.
+func (c *Client) KeyString() string {
+	return fmt.Sprint(c.clientID)
 }
 
 // DeleteSelf deletes the current client from the current session.

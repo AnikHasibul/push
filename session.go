@@ -121,6 +121,11 @@ func (s *Session) Push(message interface{}) {
 	wg.Wait()
 }
 
+// closeClient closes a client channel/connection
+func (s *Session) closeClient(clientID interface{}) {
+	close(s.clients[k])
+}
+
 // DeleteClient deletes the given client from the current session.
 // It's safe to delete a non-existent client.
 func (s *Session) DeleteClient(clientID interface{}) {
@@ -130,6 +135,12 @@ func (s *Session) DeleteClient(clientID interface{}) {
 // Len returns the length/count of active clients on current session.
 func (s *Session) Len() int {
 	return len(s.clients)
+}
+
+// Exists returns true if the given client exists.
+func (s *Session) Exists(clientID interface{}) bool {
+	_, ok := s.clients[clientID]
+	return ok
 }
 
 // Clients returns the keys/IDs/names of active clients on current session.
@@ -149,7 +160,10 @@ func (s *Session) DeleteSelf() {
 // pull ...
 func (s *Session) pull(clientID interface{}) (content interface{}, err error) {
 	if ch, ok := s.clients[clientID]; ok {
-		content = <-ch
+		content, ok = <-ch
+		if !ok {
+			err = errors.New("push: client closed")
+		}
 	} else {
 		err = errors.New("push: no such client")
 	}
@@ -171,4 +185,10 @@ func (s *Session) pullChan(clientID interface{}) (message ClientChan, err error)
 // It's safe to delete a non-existent session.
 func DeleteSession(sessionID interface{}) {
 	delete(cmap, sessionID)
+}
+
+// Exists returns true if the given session exists.
+func Exists(sessionID interface{}) bool {
+	_, ok := cmap[sessionID]
+	return ok
 }

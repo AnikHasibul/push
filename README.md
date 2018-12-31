@@ -15,6 +15,13 @@ func DeleteSession(sessionID interface{})
 DeleteSession deletes the given session from memory. It's safe to delete a
 non-existent session.
 
+#### func  Exists
+
+```go
+func Exists(sessionID interface{}) bool
+```
+Exists returns true if the given session exists.
+
 #### type Client
 
 ```go
@@ -23,6 +30,13 @@ type Client struct {
 ```
 
 Client holds the methods for a perticular client.
+
+#### func (*Client) Close
+
+```go
+func (c *Client) Close()
+```
+Close closes a client channel/connection
 
 #### func (*Client) DeleteSelf
 
@@ -37,6 +51,13 @@ DeleteSelf deletes the current client from the current session.
 func (c *Client) Key() interface{}
 ```
 Key returns the current clientID/name/key.
+
+#### func (*Client) KeyString
+
+```go
+func (c *Client) KeyString() string
+```
+KeyString returns the current clientID/name/key in string type.
 
 #### func (*Client) Pull
 
@@ -141,6 +162,13 @@ delete a non-existent client.
 func (s *Session) DeleteSelf()
 ```
 DeleteSelf deletes the current session from memory.
+
+#### func (*Session) Exists
+
+```go
+func (s *Session) Exists(clientID interface{}) bool
+```
+Exists returns true if the given client exists.
 
 #### func (*Session) Len
 
