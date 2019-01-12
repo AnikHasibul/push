@@ -15,7 +15,8 @@
 * Copyright (C) Hasibul Hasan (Anik), 2018
  */
 
-// Package push gives you the ability to use push and pull mechanism for notification or message via websocket or even http client.
+// Package push gives you the ability to use push and pull mechanism
+// for notification or message via websocket or even http client.
 package push
 
 import (
@@ -34,7 +35,8 @@ var cmap = make(clientmap)
 // Session holds the methods for push and pull mechanism
 type Session struct {
 
-	//	`MaxChannelBuffer` means the maximum buffered message on a client channel. `make(chan interface{},MaxChannelBuffer)`.
+	//	`MaxChannelBuffer` means the maximum buffered message on a client channel.
+	// `make(chan interface{},MaxChannelBuffer)`.
 	// Default value is 10
 	MaxChannelBuffer int
 	id               interface{}
@@ -50,7 +52,9 @@ type ClientChan chan interface{}
 // That's why the clientID should be unique for each device/client/connection.
 //
 //
-//	`sessionID` means the userID or a groupID. Once a `Session` receives a message, it pushes the message to all registered client for this session.
+//	`sessionID` means the userID or a groupID.
+// Once a `Session` receives a message,
+// it pushes the message to all registered client for this session.
 //
 func NewSession(sessionID interface{}) *Session {
 	// if the session doesn't exist, create a new one
@@ -178,7 +182,7 @@ func (s *Session) pullChan(clientID interface{}) (message ClientChan, err error)
 	}
 	err = errors.New("push: no such client")
 
-	return
+	return nil, err
 }
 
 // DeleteSession deletes the given session from memory.
