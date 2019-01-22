@@ -30,7 +30,7 @@ type (
 )
 
 var mu sync.Mutex
-var cmap = make(clientmap)
+var sessionMap = make(clientmap)
 
 // Session holds the methods for push and pull mechanism
 type Session struct {
@@ -58,16 +58,16 @@ type ClientChan chan interface{}
 //
 func NewSession(sessionID interface{}) *Session {
 	// if the session doesn't exist, create a new one
-	if _, ok := cmap[sessionID]; !ok {
+	if _, ok := sessionMap[sessionID]; !ok {
 		mu.Lock()
-		cmap[sessionID] = &Session{
+		sessionMap[sessionID] = &Session{
 			id:               sessionID,
 			MaxChannelBuffer: 10,
 			clients:          make(clients),
 		}
 		mu.Unlock()
 	}
-	return cmap[sessionID]
+	return sessionMap[sessionID]
 }
 
 // NewClient returns a `Client`.
@@ -84,11 +84,11 @@ func NewSession(sessionID interface{}) *Session {
 func (s *Session) NewClient(clientID interface{}) *Client {
 
 	// if the client exists, return the existing one
-	if _, ok := cmap[s.id].
+	if _, ok := sessionMap[s.id].
 		clients[clientID]; ok {
 		return &Client{
 			clientID: clientID,
-			session:  cmap[s.id],
+			session:  sessionMap[s.id],
 		}
 	}
 	// panic for nil
@@ -98,13 +98,13 @@ func (s *Session) NewClient(clientID interface{}) *Client {
 	// create a new one
 	clientChan := make(ClientChan, s.MaxChannelBuffer)
 	mu.Lock()
-	cmap[s.id].clients[clientID] = clientChan
+	sessionMap[s.id].clients[clientID] = clientChan
 	mu.Unlock()
 
 	// return the created client
 	return &Client{
 		clientID: clientID,
-		session:  cmap[s.id],
+		session:  sessionMap[s.id],
 	}
 }
 
@@ -118,6 +118,11 @@ func (s *Session) Push(message interface{}) {
 	for key := range s.clients {
 		wg.Add(1)
 		go func(k interface{}) {
+			defer func() {
+				// safe send to a channel
+				// ignore closed send error
+				recover()
+			}()
 			defer wg.Done()
 			s.clients[k] <- message
 		}(key)
@@ -127,22 +132,32 @@ func (s *Session) Push(message interface{}) {
 
 // closeClient closes a client channel/connection
 func (s *Session) closeClient(clientID interface{}) {
-	close(s.clients[clientID])
+	mu.Lock()
+	defer mu.Unlock()
+	if s.clients[clientID] != nil {
+		close(s.clients[clientID])
+	}
 }
 
 // DeleteClient deletes the given client from the current session.
 // It's safe to delete a non-existent client.
 func (s *Session) DeleteClient(clientID interface{}) {
+	mu.Lock()
+	defer mu.Unlock()
 	delete(s.clients, clientID)
 }
 
 // Len returns the length/count of active clients on current session.
 func (s *Session) Len() int {
+	mu.Lock()
+	defer mu.Unlock()
 	return len(s.clients)
 }
 
 // Exists returns true if the given client exists.
 func (s *Session) Exists(clientID interface{}) bool {
+	mu.Lock()
+	defer mu.Unlock()
 	_, ok := s.clients[clientID]
 	return ok
 }
@@ -158,7 +173,7 @@ func (s *Session) Clients() []interface{} {
 
 // DeleteSelf deletes the current session from memory.
 func (s *Session) DeleteSelf() {
-	delete(cmap, s.id)
+	delete(sessionMap, s.id)
 }
 
 // pull ...
@@ -188,11 +203,13 @@ func (s *Session) pullChan(clientID interface{}) (message ClientChan, err error)
 // DeleteSession deletes the given session from memory.
 // It's safe to delete a non-existent session.
 func DeleteSession(sessionID interface{}) {
-	delete(cmap, sessionID)
+	mu.Lock()
+	defer mu.Unlock()
+	delete(sessionMap, sessionID)
 }
 
 // Exists returns true if the given session exists.
 func Exists(sessionID interface{}) bool {
-	_, ok := cmap[sessionID]
+	_, ok := sessionMap[sessionID]
 	return ok
 }
